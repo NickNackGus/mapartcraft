@@ -18,7 +18,12 @@ class ViewOnline2D extends Component {
     zoomFactor: 1,
     canvasOffset_x: 0,
     canvasOffset_y: 0,
+    focusedChunks: [],
   };
+
+  rowInput = 0;
+  columnInput = 0;
+  alphaColorIdx = 61;
 
   paletteIdToColourSetIdAndBlockId = [];
   mouse = { x: 0, y: 0, down: false, movedSinceDown: null };
@@ -85,7 +90,6 @@ class ViewOnline2D extends Component {
       canvasRef_viewOnline_ctx.font = "16px kenpixel_mini_square";
       canvasRef_viewOnline_ctx.fillStyle = "rgba(0, 0, 0, 1)";
       canvasRef_viewOnline_ctx.fillRect(0, 0, 33 * 128 * optionValue_mapSize_x, 33 * (128 * optionValue_mapSize_y + 1));
-      let currentY = null;
       let processedNoobline = false;
       for (const block of viewOnline_NBT_decompressed.value.blocks.value.value) {
         const block_paletteId = block.state.value;
@@ -128,7 +132,10 @@ class ViewOnline2D extends Component {
           32,
           32
         );
-        if (block_coords[2] !== 0) {
+        /*
+        //original 2D view block shadow code
+          let currentY = null;
+          if (block_coords[2] !== 0) {
           if (block_coords[1] > currentY) {
             canvasRef_viewOnline_ctx.fillStyle = "rgba(0, 0, 32, 0.2)";
             for (let i = 0; i < 4; i++) {
@@ -142,6 +149,7 @@ class ViewOnline2D extends Component {
           }
         }
         currentY = block_coords[1];
+        */
         canvasRef_viewOnline_ctx.strokeStyle = "rgba(0, 0, 0, 1)";
         canvasRef_viewOnline_ctx.fillStyle = "rgba(255, 255, 255, 1)";
         if (
@@ -152,12 +160,22 @@ class ViewOnline2D extends Component {
             MapModes.MAPDAT.staircaseModes.ON_UNOBTAINABLE.uniqueId,
           ].includes(optionValue_staircasing)
         ) {
-          canvasRef_viewOnline_ctx.strokeText(block_coords[1], 33 * block_coords[0] + 31, 33 * (block_coords[2] + 1) - 2, 31);
-          canvasRef_viewOnline_ctx.fillText(block_coords[1], 33 * block_coords[0] + 31, 33 * (block_coords[2] + 1) - 2, 31);
+          if(int_colourSetId !== this.alphaColorIdx) {
+            canvasRef_viewOnline_ctx.strokeText(block_coords[1], 33 * block_coords[0] + 31, 33 * (block_coords[2] + 1) - 2, 31);
+            canvasRef_viewOnline_ctx.fillText(block_coords[1], 33 * block_coords[0] + 31, 33 * (block_coords[2] + 1) - 2, 31);
+          }
         }
       }
       for (let whichChunk_x = 0; whichChunk_x < 8 * optionValue_mapSize_x; whichChunk_x++) {
         for (let whichChunk_y = -1; whichChunk_y < 8 * optionValue_mapSize_y; whichChunk_y++) {
+          if(!this.isFocusedChunkArrayEmpty()) {
+            if(whichChunk_y > -1) {
+              if(!this.isInFocusedChunkArray(whichChunk_y+1, whichChunk_x+1)) {
+                canvasRef_viewOnline_ctx.fillStyle = "rgba(0, 0, 32, 0.4)";
+                canvasRef_viewOnline_ctx.fillRect(33 * 16*  whichChunk_x, 33 * (16 * whichChunk_y + 1), 33*16, 33*16);
+              }
+            }
+          }
           canvasRef_viewOnline_ctx.fillStyle = "rgba(255, 0, 0, 1)";
           for (let x = 0; x < 16; x++) {
             for (let y = 0; y < 16; y++) {
@@ -166,12 +184,63 @@ class ViewOnline2D extends Component {
             }
           }
           canvasRef_viewOnline_ctx.fillStyle = "rgba(0, 0, 255, 1)";
-          canvasRef_viewOnline_ctx.fillRect(33 * 16 * (whichChunk_x + 1) - 1, 33 * (16 * whichChunk_y + 1), 1, 33 * 16);
-          canvasRef_viewOnline_ctx.fillRect(33 * 16 * whichChunk_x, 33 * (16 * (whichChunk_y + 1) + 1) - 1, 33 * 16, 1);
+          canvasRef_viewOnline_ctx.fillRect(33 * 16 * (whichChunk_x + 1) - 1, 33 * (16 * whichChunk_y + 1), 3, 33 * 16);
+          canvasRef_viewOnline_ctx.fillRect(33 * 16 * whichChunk_x, 33 * (16 * (whichChunk_y + 1) + 1) - 1, 33 * 16, 3);
         }
       }
     };
     img_textures.src = IMG_Textures;
+  }
+
+  isInFocusedChunkArray(chunkRow, chunkColumn) {
+    const { focusedChunks } = this.state;
+    if(this.isFocusedChunkArrayEmpty()) return false;
+    for (const chunk of focusedChunks) {
+      if((chunk.row === chunkRow) && (chunk.column === chunkColumn)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  isFocusedChunkArrayEmpty() {
+    const { focusedChunks } = this.state;
+    if(focusedChunks.length === 0){
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+
+  onResetList = () => {
+    this.setState({
+      focusedChunks: [],
+    }, () => {
+      this.drawNBT();
+    });
+  }
+
+  onAddChunkToList = () => {
+    const { focusedChunks } = this.state;
+    let updatedFocusedChunks = focusedChunks;
+    if(!this.isInFocusedChunkArray(this.rowInput, this.columnInput)) {
+      let chunkCoords = { row: this.rowInput, column: this.columnInput };
+      focusedChunks.push(chunkCoords);
+    }
+    this.setState({
+      focusedChunks: updatedFocusedChunks,
+    }, () => {
+      this.drawNBT();
+    });
+  }
+
+  onRowChanged = (e) => {
+    this.rowInput=parseInt(e.target.value);
+  }
+
+  onColumnChanged = (e) => {
+    this.columnInput=parseInt(e.target.value);
   }
 
   handleScroll_document = function (e) {
@@ -197,7 +266,7 @@ class ViewOnline2D extends Component {
   }.bind(this);
 
   handleMouseDown = function (e) {
-    e.preventDefault();
+    //e.preventDefault();   //breaks input text element.  Haven't found a case where removing breaks functionality
     this.mouse.x = parseInt(e.clientX);
     this.mouse.y = parseInt(e.clientY);
     this.mouse.down = true;
@@ -222,11 +291,15 @@ class ViewOnline2D extends Component {
           if (block_coords[0] === block_x && block_coords[2] === block_z) {
             const block_paletteId = block.state.value;
             const [selectedBlock_colourSetId, selectedBlock_blockId] = this.paletteIdToColourSetIdAndBlockId[block_paletteId];
+            const chunkRow = Math.ceil(block_coords[2]/16);
+            const chunkCol = Math.ceil((block_coords[0]+1)/16);
             this.setState({
               selectedBlock: {
                 x: block_coords[0],
                 y: block_coords[1],
                 z: block_coords[2],
+                row: chunkRow,
+                column: chunkCol,
                 colourSetId: selectedBlock_colourSetId,
                 blockId: selectedBlock_blockId,
               },
@@ -297,6 +370,19 @@ class ViewOnline2D extends Component {
         <h1 style={{ cursor: "pointer" }} onClick={onChooseViewOnline3D}>
           3D
         </h1>
+        <br />
+      </div>
+    );
+
+    let component_uiEnhancements = (
+      <div>
+        {getLocaleString("MATERIALS/CHUNKMATS-ROWS")}{" "}
+        <input type="text" class="chunkCoordsInput" name="rowVal" onChange={this.onRowChanged}/>
+        {getLocaleString("MATERIALS/CHUNKMATS-COLUMNS")}{" "}
+        <input type="text" class="chunkCoordsInput" name="colVal" onChange={this.onColumnChanged}/>
+        <br />
+        <button onClick={this.onResetList}>{getLocaleString("MATERIALS/CHUNKMATS-RESET")}</button>
+        <button onClick={this.onAddChunkToList}>{getLocaleString("MATERIALS/CHUNKMATS-ADD")}</button>
       </div>
     );
 
@@ -336,6 +422,7 @@ class ViewOnline2D extends Component {
     const component_topBar = (
       <div className="topBar">
         {component_controls}
+        {component_uiEnhancements}
         {component_waila}
         {component_size}
       </div>
