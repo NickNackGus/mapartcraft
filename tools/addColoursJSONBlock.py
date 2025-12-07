@@ -4,6 +4,7 @@
 
 import os
 import logging
+import subprocess
 
 from SAOLogging import getParser, setupRootLogger
 from JSONIO import JSONIO
@@ -121,35 +122,34 @@ def addTexture(coloursJSON,
     logging.debug("Check passed")
 
     logging.debug("Expanding textures sheet if necessary")
-    os.system("magick {texturesSheetPath} -background transparent -extent \"%[fx:max(w,{newWidth})]x%[h]\" {texturesSheetPath}".format(
-        newWidth = str(32 * len(coloursJSON[str(colourSetId)]["blocks"].keys())),
-        texturesSheetPath = texturesSheetPath))
+    newWidth = str(32 * len(coloursJSON[str(colourSetId)]["blocks"].keys()))
+    subprocess.run((
+        "magick", str(texturesSheetPath), "-background", "transparent", "-extent", f"%[fx:max(w,{newWidth})]x%[h]", str(texturesSheetPath),
+    ))
 
     logging.debug("Moving existing blocks if necessary")
     numberOfBlocksToMove = len(list(coloursJSON[str(colourSetId)]["blocks"].keys())[blockId + 1:])
-    os.system(
-        "convert {texturesSheetPath} \
-        \\( -clone 0 -crop {widthToMove}x32+{moveFrom_x}+{moveFrom_y} \\) \
-        \\( -clone 0-1 -compose subtract -geometry +{moveFrom_x}+{moveFrom_y} -composite \\) -delete 0 +swap \
-        -geometry +{moveTo_x}+{moveTo_y} -compose Over -composite \
-        {texturesSheetPath}".format(
-        texturesSheetPath = texturesSheetPath,
-        widthToMove = str(32 * numberOfBlocksToMove),
-        moveFrom_x = str(32 * blockId),
-        moveFrom_y = str(32 * colourSetId),
-        moveTo_x = str(32 * (blockId + 1)),
-        moveTo_y = str(32 * colourSetId)
-        )
-    )
+    widthToMove = str(32 * numberOfBlocksToMove)
+    moveFrom_x = str(32 * blockId)
+    moveFrom_y = str(32 * colourSetId)
+    moveTo_x = str(32 * (blockId + 1))
+    moveTo_y = str(32 * colourSetId)
+    subprocess.run((
+        "magick", str(texturesSheetPath),
+        "(", "-clone", "0", "-crop", f"{widthToMove}x32+{moveFrom_x}+{moveFrom_y}", ")",
+        "(", "-clone", "0-1", "-compose", "subtract", "-geometry", f"+{moveFrom_x}+{moveFrom_y}", "-composite", ")",
+        "-delete", "0", "+swap",
+        "-geometry", f"+{moveTo_x}+{moveTo_y}", "-compose", "Over", "-composite",
+        str(texturesSheetPath),
+    ))
 
     logging.debug("Adding new image onto textures sheet")
-    os.system("convert {texturesSheetPath} \\( {textureImagePath} -filter point -resize 32x32 \\) \
-        -geometry +{placeAt_x}+{placeAt_y} -composite \
-        {texturesSheetPath}".format(
-        texturesSheetPath = texturesSheetPath,
-        textureImagePath = textureImagePath,
-        placeAt_x = str(32 * blockId),
-        placeAt_y = str(32 * colourSetId)
+    placeAt_x = str(32 * blockId)
+    placeAt_y = str(32 * colourSetId)
+    subprocess.run((
+        "magick", str(texturesSheetPath), "(", str(textureImagePath), "-filter", "point", "-resize", "32x32", ")",
+        "-geometry", f"+{placeAt_x}+{placeAt_y}", "-composite",
+        str(texturesSheetPath),
     ))
     logging.debug("Added texture")
 
